@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Afinador punteiro</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#0d1117;color:#e8eaf0;min-height:100vh;padding:20px;max-width:900px;margin:0 auto}
+h1{font-size:17px;font-weight:500;margin-bottom:2px}
+.sub{font-size:12px;color:#6b7280;margin-bottom:18px}
+.scenario-wrap{margin-bottom:18px}
+.scenario-label{font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px}
+.scenario-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.sc-card{background:#161b27;border:1.5px solid #2a2f45;border-radius:10px;padding:12px 10px;cursor:pointer;transition:border-color .15s,background .15s}
+.sc-card:hover{border-color:#4b5563;background:#1c2235}
+.sc-card.selected{border-color:#2563eb;background:#0f1e3a}
+.sc-card.locked{cursor:not-allowed;opacity:.5;pointer-events:none}
+.sc-icon{font-size:20px;margin-bottom:5px}
+.sc-name{font-size:13px;font-weight:500;color:#e8eaf0;margin-bottom:3px}
+.sc-desc{font-size:10px;color:#6b7280;line-height:1.4}
+.sc-params{margin-top:7px;display:flex;flex-direction:column;gap:2px}
+.sc-param{font-size:9px;padding:2px 6px;border-radius:4px;display:inline-block;width:fit-content}
+.sc-param.on{background:#0f2818;color:#4ade80}
+.sc-param.off{background:#1e2536;color:#4b5563;text-decoration:line-through}
+.top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+button{padding:7px 16px;border-radius:7px;border:1px solid #374151;background:#1c2030;color:#e8eaf0;font-size:13px;cursor:pointer;transition:background .12s}
+button:hover{background:#252a3a}
+button.go{background:#2563eb;border-color:#2563eb;color:#fff}
+button.go:hover{background:#1d4ed8}
+button.stp{background:#991b1b;border-color:#991b1b;color:#fff}
+button.stp:hover{background:#7f1d1d}
+button:disabled{opacity:.35;cursor:not-allowed}
+.cfg{display:flex;align-items:center;gap:5px;font-size:12px;color:#9ca3af}
+.cfg input[type=number]{width:54px;padding:5px 7px;border-radius:6px;border:1px solid #374151;background:#161b27;color:#e8eaf0;font-size:12px;text-align:center}
+.dot{width:8px;height:8px;border-radius:50%;background:#374151;transition:background .3s;flex-shrink:0}
+.dot.on{background:#22c55e;box-shadow:0 0 5px #22c55e}
+.stlabel{font-size:12px;color:#9ca3af;display:flex;align-items:center;gap:6px}
+.scount{font-size:11px;color:#4b5563;padding:3px 8px;border-radius:10px;background:#161b27;border:1px solid #1e2536}
+.sc-badge{font-size:11px;padding:2px 8px;border-radius:10px;background:#0f1e3a;color:#60a5fa;border:1px solid #1e3a5f}
+.qc-strip{display:flex;gap:5px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.qc-pill{font-size:10px;padding:3px 8px;border-radius:10px;border:1px solid #1e2536;color:#6b7280;background:#161b27}
+.qc-pill.ok{border-color:#14532d;color:#4ade80;background:#0a1a0a}
+.qc-pill.warn{border-color:#78350f;color:#fbbf24;background:#1a1000}
+.qc-pill.bad{border-color:#7f1d1d;color:#f87171;background:#1a0808}
+.conf-bar-wrap{font-size:10px;color:#4b5563;display:flex;align-items:center;gap:5px}
+.conf-bar{width:55px;height:5px;background:#1e2536;border-radius:3px;overflow:hidden}
+.conf-fill{height:100%;background:#2563eb;border-radius:3px;transition:width .1s}
+.now{display:grid;grid-template-columns:120px 1fr;gap:12px;margin-bottom:14px}
+.note-box{background:#161b27;border:1px solid #2a2f45;border-radius:10px;padding:14px;text-align:center}
+.note-big{font-size:46px;font-weight:700;line-height:1;color:#fff;min-height:52px}
+.note-hz{font-size:11px;color:#6b7280;margin-top:3px}
+.note-conf{font-size:10px;margin-top:2px}
+.meter-box{background:#161b27;border:1px solid #2a2f45;border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;justify-content:space-between}
+.meter-wrap{position:relative;height:24px;background:#0d1117;border-radius:5px;overflow:hidden;margin-bottom:6px}
+.m-left{position:absolute;left:0;top:0;bottom:0;width:50%;background:linear-gradient(to right,#7f1d1d,#92400e)}
+.m-right{position:absolute;right:0;top:0;bottom:0;width:50%;background:linear-gradient(to left,#7f1d1d,#92400e)}
+.m-center{position:absolute;left:calc(50% - 9px);top:0;bottom:0;width:18px;background:#14532d}
+.m-needle{position:absolute;top:3px;bottom:3px;width:3px;border-radius:2px;background:#fff;transform:translateX(-50%);left:50%;transition:left .08s ease-out}
+.m-needle.good{background:#4ade80}.m-needle.bad{background:#f87171}
+.m-ticks{display:flex;justify-content:space-between;font-size:10px;color:#4b5563;margin-bottom:8px}
+.cents-big{font-size:28px;font-weight:600;text-align:center;font-variant-numeric:tabular-nums}
+.cents-big.good{color:#4ade80}.cents-big.bad{color:#f87171}.cents-big.off{color:#6b7280}
+.offset-banner{border-radius:9px;padding:11px 14px;margin-bottom:14px;display:none;border:1px solid}
+.offset-banner.hi{background:#2d1515;border-color:#7f1d1d}
+.offset-banner.lo{background:#0f1e35;border-color:#1e3a5f}
+.offset-banner.ok{background:#0f2010;border-color:#14532d}
+.ob-title{font-size:11px;color:#9ca3af;margin-bottom:2px}
+.ob-value{font-size:20px;font-weight:600}
+.ob-value.hi{color:#f87171}.ob-value.lo{color:#60a5fa}.ob-value.ok{color:#4ade80}
+.ob-sub{font-size:11px;color:#9ca3af;margin-top:2px}
+.stats-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.stats-head h2{font-size:13px;font-weight:500;color:#9ca3af}
+.badge{font-size:11px;padding:2px 8px;border-radius:10px;background:#1e3a5f;color:#60a5fa}
+.legend{display:flex;gap:12px;font-size:10px;color:#6b7280;margin-bottom:8px;flex-wrap:wrap}
+.legend span{display:flex;align-items:center;gap:4px}
+.ldot{width:8px;height:8px;border-radius:2px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;padding:6px 8px;color:#6b7280;font-weight:400;font-size:10px;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #1e2536;cursor:help}
+td{padding:6px 8px;border-bottom:1px solid #111827;font-variant-numeric:tabular-nums;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr.flag-row td{background:#180f0f}
+.n-name{font-size:14px;font-weight:600;color:#fff;width:40px}
+.n-count{color:#4b5563;width:40px;font-size:11px}
+.col-abs{width:64px}.col-rel{width:72px}.col-std{width:48px}
+.v-hi{color:#f87171}.v-lo{color:#60a5fa}.v-ok{color:#4ade80}.v-off{color:#6b7280}
+.hist-cell{min-width:105px}
+.hist-wrap{height:16px;display:flex;align-items:flex-end;gap:1px}
+.hbar{min-width:2px;border-radius:1px 1px 0 0}
+.hbar.lo{background:#3b82f6}.hbar.ok{background:#22c55e}.hbar.hi{background:#ef4444}
+.dist-txt{font-size:9px;color:#4b5563;margin-top:2px}
+.dist-lo{color:#60a5fa}.dist-ok{color:#4ade80}.dist-hi{color:#f87171}
+.verdict{font-size:11px;padding:2px 7px;border-radius:4px;white-space:nowrap;font-weight:500}
+.vd-ok{background:#14532d;color:#4ade80}
+.vd-hi{background:#7f1d1d;color:#fca5a5}
+.vd-lo{background:#1e3a5f;color:#93c5fd}
+.vd-var{background:#3b1f00;color:#fbbf24}
+.vd-few{background:#1e2536;color:#6b7280}
+.empty{text-align:center;padding:28px;color:#374151;font-size:13px}
+.reject-info{font-size:10px;color:#4b5563;text-align:right;margin-top:6px}
+@media(max-width:560px){.scenario-cards{grid-template-columns:1fr}.now{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<h1>Afinador de punteiro</h1>
+<p class="sub">Detección robusta · YIN corregido · filtros por escenario</p>
+
+<div class="scenario-wrap" id="scenarioWrap">
+  <div class="scenario-label">Escenario — selecciona antes de iniciar</div>
+  <div class="scenario-cards">
+    <div class="sc-card selected" id="sc-0" onclick="selectScenario(0)">
+      <div class="sc-icon">🎵</div>
+      <div class="sc-name">Una gaita</div>
+      <div class="sc-desc">Punteiro + ronco + roncón. Sin otras gaitas ni percusión.</div>
+      <div class="sc-params">
+        <span class="sc-param on">HPF + YIN log-tau</span>
+        <span class="sc-param on">Filtro armónicos ronco</span>
+        <span class="sc-param off">Filtro batidos FFT</span>
+        <span class="sc-param off">Detector percusión</span>
+      </div>
+    </div>
+    <div class="sc-card" id="sc-1" onclick="selectScenario(1)">
+      <div class="sc-icon">🎶</div>
+      <div class="sc-name">Varias gaitas</div>
+      <div class="sc-desc">Micro pegado al punteiro. Sin percusión. Batidos entre gaitas.</div>
+      <div class="sc-params">
+        <span class="sc-param on">HPF + YIN log-tau</span>
+        <span class="sc-param on">Filtro armónicos ronco</span>
+        <span class="sc-param on">Filtro batidos FFT</span>
+        <span class="sc-param off">Detector percusión</span>
+      </div>
+    </div>
+    <div class="sc-card" id="sc-2" onclick="selectScenario(2)">
+      <div class="sc-icon">🥁</div>
+      <div class="sc-name">Banda completa</div>
+      <div class="sc-desc">Gaitas + bombo + caja + tambor. Micro pegado al punteiro.</div>
+      <div class="sc-params">
+        <span class="sc-param on">HPF + YIN log-tau</span>
+        <span class="sc-param on">Filtro armónicos ronco</span>
+        <span class="sc-param on">Filtro batidos FFT</span>
+        <span class="sc-param on">Detector percusión dual</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="top">
+  <button class="go" id="btnStart">▶ Iniciar</button>
+  <button class="stp" id="btnStop" disabled>■ Parar</button>
+  <button id="btnClear">Limpiar</button>
+  <div class="cfg"><span>Ref.</span><input type="number" id="refHz" value="440" min="420" max="480" step="1"><span>Hz</span></div>
+  <div class="cfg"><span>Umbral</span><input type="number" id="tuneThr" value="12" min="5" max="30" step="1"><span>¢</span></div>
+  <span class="stlabel"><span class="dot" id="dot"></span><span id="sttext">Sin micrófono</span></span>
+  <span class="sc-badge" id="scBadge">Una gaita</span>
+  <span class="scount" id="scount">0 ac · 0 rech</span>
+</div>
+
+<div class="qc-strip">
+  <span class="qc-pill" id="qcDb">Nivel: —</span>
+  <span class="qc-pill" id="qcPerc">Percus: —</span>
+  <span class="qc-pill" id="qcFreq">Rango: —</span>
+  <span class="qc-pill" id="qcHarm">Armón: —</span>
+  <span class="qc-pill" id="qcBeat">Batido: —</span>
+  <span class="qc-pill" id="qcStab">Estab: —</span>
+  <div class="conf-bar-wrap">Conf:<div class="conf-bar"><div class="conf-fill" id="confFill"></div></div><span id="confPct">—</span></div>
+</div>
+
+<div class="now">
+  <div class="note-box">
+    <div class="note-big" id="noteName">—</div>
+    <div class="note-hz" id="noteHz">— Hz</div>
+    <div class="note-conf" id="noteConf" style="color:#4b5563">—</div>
+  </div>
+  <div class="meter-box">
+    <div>
+      <div class="meter-wrap">
+        <div class="m-left"></div><div class="m-right"></div><div class="m-center"></div>
+        <div class="m-needle" id="needle"></div>
+      </div>
+      <div class="m-ticks"><span>−50¢</span><span>−25¢</span><span>0</span><span>+25¢</span><span>+50¢</span></div>
+    </div>
+    <div class="cents-big off" id="centsVal">— ¢</div>
+  </div>
+</div>
+
+<div class="offset-banner" id="offsetBanner">
+  <div class="ob-title">Offset global de la gaita</div>
+  <div class="ob-value" id="obValue">—</div>
+  <div class="ob-sub" id="obSub">—</div>
+</div>
+
+<div class="stats-head">
+  <h2>Notas</h2>
+  <span class="badge" id="badge" style="display:none"></span>
+</div>
+<div class="legend">
+  <span><div class="ldot" style="background:#ef4444"></div>Alta</span>
+  <span><div class="ldot" style="background:#3b82f6"></div>Baja</span>
+  <span><div class="ldot" style="background:#22c55e"></div>Afinada</span>
+  <span style="color:#fbbf24">· "vs offset" = corrección individual necesaria en el punteiro</span>
+</div>
+<div id="statsWrap"><div class="empty">Selecciona escenario e inicia</div></div>
+<div class="reject-info" id="rejectInfo"></div>
+
+<script>
+// ─── Escala ───────────────────────────────────────────────────────────────
+const STAT_NOTES=[
+  {name:'Si',st:11},{name:'Do',st:0},{name:'Re',st:2},
+  {name:'Mib',st:3},{name:'Mi',st:4},{name:'Fa',st:5},
+  {name:'Sol',st:7},{name:'Lab',st:8},{name:'La',st:9},
+  {name:'Sib',st:10}
+];
+
+// ─── Perfiles por escenario ───────────────────────────────────────────────
+const SCENARIOS=[
+  { id:0, name:'Una gaita',
+    bufSize:2048, minDB:-48,
+    freqMin:430, freqMax:1050,
+    yinThr:0.15, minConf:0.55,
+    stabWin:3, stabCents:30,
+    droneBase:123.47, droneMarginHz:15, droneMaxK:8,
+    filterBeats:false, beatPeakRatio:0.6, beatCents:100,
+    filterPercussion:false,
+    percLowRatio:0.12, percDropRatio:6.0,
+    trimPct:0.05, minSamples:8, outlierSigma:2.5 },
+  { id:1, name:'Varias gaitas',
+    bufSize:4096, minDB:-44,
+    freqMin:430, freqMax:1050,
+    yinThr:0.12, minConf:0.62,
+    stabWin:5, stabCents:24,
+    droneBase:123.47, droneMarginHz:15, droneMaxK:8,
+    filterBeats:true, beatPeakRatio:0.55, beatCents:100,
+    filterPercussion:false,
+    percLowRatio:0.12, percDropRatio:6.0,
+    trimPct:0.10, minSamples:12, outlierSigma:2.2 },
+  { id:2, name:'Banda completa',
+    bufSize:4096, minDB:-40,
+    freqMin:430, freqMax:1050,
+    yinThr:0.10, minConf:0.68,
+    stabWin:6, stabCents:20,
+    droneBase:123.47, droneMarginHz:15, droneMaxK:8,
+    filterBeats:true, beatPeakRatio:0.55, beatCents:100,
+    filterPercussion:true,
+    percLowRatio:0.12, percDropRatio:5.0,
+    trimPct:0.12, minSamples:15, outlierSigma:2.0 }
+];
+
+const SR=44100;
+let selSc=0, ctx, analyser, src, proc, running=false;
+let stats={}; STAT_NOTES.forEach(n=>stats[n.st]=[]);
+let totalAcc=0, totalRej=0;
+let freqQueue=[], lastAccFreq=0;
+
+function getCfg(){ return SCENARIOS[selSc]; }
+function getRef(){ return parseFloat(document.getElementById('refHz').value)||440; }
+function getThr(){ return parseFloat(document.getElementById('tuneThr').value)||12; }
+
+function selectScenario(idx){
+  if(running) return;
+  selSc=idx;
+  document.querySelectorAll('.sc-card').forEach((c,i)=>c.classList.toggle('selected',i===idx));
+  document.getElementById('scBadge').textContent=SCENARIOS[idx].name;
+}
+
+// ─── HPF de 1er orden ────────────────────────────────────────────────────
+// Atenúa frecuencias del roncón (<300Hz) antes del YIN
+// α=0.92 → fc ≈ 300Hz @ 44100Hz
+function hpf(buf, alpha=0.92){
+  const out=new Float32Array(buf.length);
+  out[0]=buf[0];
+  for(let i=1;i<buf.length;i++)
+    out[i]=alpha*(out[i-1]+buf[i]-buf[i-1]);
+  return out;
+}
+
+// ─── YIN CMND con interpolación en log(tau) ──────────────────────────────
+// Mejora clave: la interpolación parabólica estándar introduce sesgo sistemático
+// de +20-35¢ en las frecuencias del punteiro. La interpolación en log(tau)
+// lo reduce a <1¢.
+function yinPitch(buf, cfg){
+  const N=buf.length, half=Math.floor(N/2);
+
+  // HPF para atenuar roncón
+  const filtered=hpf(buf);
+
+  // CMND (Cumulative Mean Normalized Difference)
+  const d=new Float32Array(half); d[0]=1.0;
+  let runSum=0.0;
+  for(let tau=1;tau<half;tau++){
+    let s=0;
+    for(let i=0;i<half;i++){const dv=filtered[i]-filtered[i+tau];s+=dv*dv;}
+    runSum+=s;
+    d[tau]=(tau*s)/(runSum+1e-10);
+  }
+
+  // Rango de tau correspondiente al rango de frecuencia del punteiro
+  const tauMin=Math.max(2, Math.floor(SR/cfg.freqMax));
+  const tauMax=Math.min(half-2, Math.ceil(SR/cfg.freqMin)+1);
+
+  // Buscar primer mínimo local por debajo del umbral
+  let bestTau=-1, bestD=1.0;
+  for(let tau=tauMin;tau<=tauMax-1;tau++){
+    if(d[tau]<cfg.yinThr && d[tau]<d[tau+1] && (tau===tauMin||d[tau]<=d[tau-1])){
+      bestTau=tau; bestD=d[tau]; break;
+    }
+  }
+  // Fallback: mínimo global en rango
+  if(bestTau<0){
+    for(let tau=tauMin;tau<=tauMax;tau++){
+      if(d[tau]<bestD){bestD=d[tau];bestTau=tau;}
+    }
+  }
+  if(bestTau<2) return{freq:-1,conf:0};
+
+  // Interpolación parabólica en log(tau) — elimina sesgo sistemático
+  const x0=Math.max(tauMin,bestTau-1);
+  const x2=Math.min(tauMax,bestTau+1);
+  let tauRefined=bestTau;
+  if(x0<bestTau && bestTau<x2){
+    const l0=Math.log(x0), l1=Math.log(bestTau), l2=Math.log(x2);
+    const s0=d[x0],s1=d[bestTau],s2=d[x2];
+    const denom=s0-2*s1+s2;
+    if(Math.abs(denom)>1e-8){
+      const logTauOpt=l1-0.5*(l2-l0)*(s2-s0)/(2*denom);
+      tauRefined=Math.exp(logTauOpt);
+    }
+  }
+
+  let freq=SR/tauRefined;
+  const conf=Math.max(0,Math.min(1,1-bestD));
+
+  // Corrección de octava: si hay más energía espectral a freq/2 → subir octava
+  if(freq/2>=cfg.freqMin && freq/2<=cfg.freqMax){
+    const fftMag=computeFFTMag(filtered);
+    const fftFreqs=getFFTFreqs(N);
+    const e1=energyNear(fftMag,fftFreqs,freq,12);
+    const e2=energyNear(fftMag,fftFreqs,freq/2,12);
+    if(e2>e1*1.8) freq=freq/2;
+  }
+
+  return{freq, conf};
+}
+
+// ─── FFT helpers (para filtros espectrales) ──────────────────────────────
+function computeFFTMag(buf){
+  // FFT real usando DFT simplificada solo para análisis espectral de energía
+  // No necesitamos precisión de pitch aquí, solo distribución de energía
+  const N=buf.length;
+  const win=new Float32Array(N);
+  for(let i=0;i<N;i++) win[i]=buf[i]*(0.5-0.5*Math.cos(2*Math.PI*i/(N-1)));
+  // DFT parcial: solo las frecuencias que necesitamos
+  return{buf:win, N};
+}
+function getFFTFreqs(N){ return SR/N; } // Hz por bin
+
+function energyNear(fftObj, freqsHz, targetFreq, marginHz){
+  // Aproximación: buscar en el buffer de tiempo los componentes cercanos a freq
+  // Para evitar DFT completa, usamos goertzel para una sola frecuencia
+  return goertzel(fftObj.buf, targetFreq, fftObj.N);
+}
+
+function goertzel(buf, freq, N){
+  // Algoritmo de Goertzel: eficiente para detectar energía en una sola frecuencia
+  const k=Math.round(N*freq/SR);
+  const omega=2*Math.PI*k/N;
+  const coeff=2*Math.cos(omega);
+  let s1=0,s2=0;
+  for(let i=0;i<N;i++){
+    const s=buf[i]+coeff*s1-s2;
+    s2=s1; s1=s;
+  }
+  return s1*s1+s2*s2-coeff*s1*s2;
+}
+
+// ─── Detector de percusión dual ──────────────────────────────────────────
+// PROBLEMA ANTERIOR: detector E1/E2 fallaba cuando el bombo llega a mitad buffer
+// SOLUCIÓN: combinamos dos métodos independientes con OR lógico:
+// 1. Energía espectral sub-250Hz (bombo concentra energía baja)
+//    PERO: el roncón también tiene energía baja → excluir banda del roncón
+// 2. Caída de energía en cuartos del buffer (transitorio temporal)
+function isPercussion(buf, cfg){
+  if(!cfg.filterPercussion) return false;
+  const N=buf.length;
+
+  // Método 1: ratio espectral (excluir banda del roncón 80-170Hz, buscar 170-280Hz)
+  // El bombo concentra energía en 60-250Hz, pero el roncón también.
+  // La clave: el bombo tiene energía en la parte alta de esa banda (150-280Hz)
+  // El roncón tiene energía en su fundamental (≈123Hz) y armónicos discretos
+  const eBombo = goertzel(buf, 80, N) + goertzel(buf, 100, N) +
+                 goertzel(buf, 120, N) + goertzel(buf, 150, N) +
+                 goertzel(buf, 200, N);
+  const ePunt  = goertzel(buf, 500, N) + goertzel(buf, 600, N) +
+                 goertzel(buf, 700, N) + goertzel(buf, 800, N);
+  const spectralRatio = eBombo / (ePunt + 1e-10);
+
+  // Método 2: caída de energía temporal en cuartos
+  const q=N>>2;
+  const e=[0,1,2,3].map(i=>{ let s=0; for(let j=q*i;j<q*(i+1);j++) s+=buf[j]*buf[j]; return s/q; });
+  const maxDrop=Math.max(e[0]/(e[1]+1e-10), e[1]/(e[2]+1e-10), e[2]/(e[3]+1e-10));
+
+  // Roncón: spectralRatio alto PERO maxDrop bajo (≈1, señal estacionaria)
+  // Bombo: spectralRatio alto Y maxDrop alto (decae rápido)
+  // Caja:  spectralRatio bajo pero maxDrop alto
+  const isBombo = spectralRatio > 3.0 && maxDrop > cfg.percDropRatio;
+  const isCaja  = maxDrop > cfg.percDropRatio * 1.5;
+
+  return isBombo || isCaja;
+}
+
+// ─── Filtro de armónicos del roncón ──────────────────────────────────────
+// Margen ampliado a ±15Hz (simulación mostró errores de 10-13Hz en YIN)
+function isHarmonicOfDrone(freq, cfg){
+  const base=cfg.droneBase;
+  for(let k=2;k<=cfg.droneMaxK;k++){
+    if(Math.abs(freq-base*k)<cfg.droneMarginHz) return true;
+  }
+  return false;
+}
+
+// ─── Detector de batidos entre punteiros ─────────────────────────────────
+// PROBLEMA ANTERIOR: basado en oscilación de frames → no funcionaba
+// porque YIN detecta la frecuencia PROMEDIO de los dos punteiros (estable)
+// SOLUCIÓN: analizar FFT buscando dos picos simultáneos en rango del punteiro
+// Si hay dos picos con energía similar a < beatCents cents → batido activo
+function hasBeat(buf, cfg){
+  if(!cfg.filterBeats) return false;
+  const N=buf.length;
+
+  // Buscar picos en rango punteiro con resolución de ≈10Hz
+  const step=10; // Hz por muestra de búsqueda
+  let peaks=[];
+  let prevE=0;
+  for(let f=cfg.freqMin;f<=cfg.freqMax;f+=step){
+    const e=goertzel(buf,f,N);
+    if(e>prevE && peaks.length>0 && e > peaks[peaks.length-1].e*0.3){
+      // posible pico local
+      peaks.push({f,e});
+    }
+    prevE=e;
+  }
+
+  // Buscar dos picos donde el menor sea ≥ beatPeakRatio del mayor
+  peaks.sort((a,b)=>b.e-a.e);
+  if(peaks.length>=2){
+    const ratio=peaks[1].e/peaks[0].e;
+    if(ratio>=cfg.beatPeakRatio){
+      const centsDiff=Math.abs(1200*Math.log2(peaks[0].f/peaks[1].f));
+      if(centsDiff>0 && centsDiff<cfg.beatCents) return true;
+    }
+  }
+  return false;
+}
+
+// ─── Estabilidad temporal ─────────────────────────────────────────────────
+function isStable(freq, cfg){
+  freqQueue.push(freq);
+  if(freqQueue.length>cfg.stabWin) freqQueue.shift();
+  if(freqQueue.length<Math.min(3,cfg.stabWin)) return false;
+  const mn=Math.min(...freqQueue), mx=Math.max(...freqQueue);
+  if(mn<=0) return false;
+  return 1200*Math.log2(mx/mn)<cfg.stabCents;
+}
+
+// ─── Conversión Hz → nota ─────────────────────────────────────────────────
+function freqToNote(freq, ref){
+  const midi=69+12*Math.log2(freq/ref);
+  const midiR=Math.round(midi);
+  const st=((midiR%12)+12)%12;
+  const cents=(midi-midiR)*100;
+  const match=STAT_NOTES.find(n=>n.st===st);
+  if(!match) return null;
+  return{name:match.name,st,cents,freq};
+}
+
+function rmsDB(buf){
+  let s=0; for(let i=0;i<buf.length;i++) s+=buf[i]*buf[i];
+  return 20*Math.log10(Math.max(Math.sqrt(s/buf.length),1e-10));
+}
+
+// ─── Pipeline QC ──────────────────────────────────────────────────────────
+function processFrame(buf){
+  const cfg=getCfg();
+
+  // 1. Nivel mínimo
+  const db=rmsDB(buf);
+  if(db<cfg.minDB){ setAllQC('—','bajo','—','—','—','—',0); return null; }
+
+  // 2. Percusión (antes del YIN para ahorrar cómputo)
+  if(isPercussion(buf,cfg)){ setAllQC('—','ok','bloqueado','—','—','—',0); totalRej++; return null; }
+
+  // 3. YIN mejorado
+  const{freq,conf}=yinPitch(buf,cfg);
+
+  // 4. Rango de frecuencia
+  if(freq<cfg.freqMin||freq>cfg.freqMax){ setAllQC('fuera rango','ok','ok','—','—','—',conf); totalRej++; return null; }
+
+  // 5. Confianza mínima
+  if(conf<cfg.minConf){ setAllQC('ok','ok','ok','baja conf','—','—',conf); totalRej++; return null; }
+
+  // 6. Armónico de roncón
+  if(isHarmonicOfDrone(freq,cfg)){ setAllQC('ok','ok','ok','armónico','—','—',conf); totalRej++; return null; }
+
+  // 7. Batidos entre punteiros
+  if(cfg.filterBeats && hasBeat(buf,cfg)){ setAllQC('ok','ok','ok','ok','batido','—',conf); totalRej++; return null; }
+
+  // 8. Estabilidad temporal
+  if(!isStable(freq,cfg)){ setAllQC('ok','ok','ok','ok','ok','inestable',conf); totalRej++; return null; }
+
+  const note=freqToNote(freq,getRef());
+  if(!note){ totalRej++; return null; }
+
+  lastAccFreq=freq;
+  setAllQC('ok','ok','ok','ok',cfg.filterBeats?'ok':'n/a',cfg.filterPercussion?'ok':'n/a',conf);
+  return{freq,conf,note};
+}
+
+function setAllQC(freq,db,perc,harm,beat,stab,conf){
+  setQC('qcDb',   db==='ok'?'ok':db==='bajo'?'bad':'warn',   db==='ok'?'Nivel ✓':'Nivel: '+db);
+  setQC('qcPerc', perc==='ok'?'ok':perc==='bloqueado'?'warn':perc==='n/a'?'':'', perc==='ok'?'Percus ✓':perc==='bloqueado'?'Percus!':perc==='n/a'?'Percus: n/a':'Percus: —');
+  setQC('qcFreq', freq==='ok'?'ok':freq==='fuera rango'?'bad':'', freq==='ok'?'Rango ✓':freq==='fuera rango'?'Fuera rango':'Rango: —');
+  setQC('qcHarm', harm==='ok'?'ok':harm==='armónico'?'bad':harm==='baja conf'?'warn':'', harm==='ok'?'Armón ✓':harm==='armónico'?'¡Armónico!':harm==='baja conf'?'Baja conf':'Armón: —');
+  setQC('qcBeat', beat==='ok'?'ok':beat==='batido'?'warn':beat==='n/a'?'':'', beat==='ok'?'Batido ✓':beat==='batido'?'¡Batido!':beat==='n/a'?'Batido: n/a':'Batido: —');
+  setQC('qcStab', stab==='ok'?'ok':stab==='inestable'?'warn':'', stab==='ok'?'Estab ✓':stab==='inestable'?'Inestable':'Estab: —');
+  const pct=Math.round(conf*100);
+  const fill=document.getElementById('confFill');
+  fill.style.width=pct+'%';
+  fill.style.background=pct>68?'#22c55e':pct>50?'#f59e0b':'#ef4444';
+  document.getElementById('confPct').textContent=conf>0?pct+'%':'—';
+}
+function setQC(id,cls,label){
+  const el=document.getElementById(id);
+  el.className='qc-pill'+(cls?' '+cls:'');
+  el.textContent=label;
+}
+
+// ─── Audio engine ─────────────────────────────────────────────────────────
+async function start(){
+  const cfg=getCfg();
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({
+      audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}
+    });
+    ctx=new AudioContext({sampleRate:SR});
+    analyser=ctx.createAnalyser(); analyser.fftSize=cfg.bufSize;
+    src=ctx.createMediaStreamSource(stream);
+    proc=ctx.createScriptProcessor(cfg.bufSize,1,1);
+    src.connect(analyser); analyser.connect(proc); proc.connect(ctx.destination);
+
+    proc.onaudioprocess=e=>{
+      const buf=e.inputBuffer.getChannelData(0);
+      const r=processFrame(buf);
+      if(r){
+        updateNow(r.note,r.freq,r.conf);
+        // Acumular con filtro de outliers: solo si está dentro de ±50¢
+        if(Math.abs(r.note.cents)<50){
+          stats[r.note.st].push(r.note.cents);
+          totalAcc++;
+          if(totalAcc%15===0) renderStats();
+        }
+      }
+      document.getElementById('scount').textContent=
+        totalAcc+' ac · '+totalRej+' rech';
+    };
+
+    running=true;
+    document.querySelectorAll('.sc-card').forEach(c=>c.classList.add('locked'));
+    document.getElementById('btnStart').disabled=true;
+    document.getElementById('btnStop').disabled=false;
+    document.getElementById('refHz').disabled=true;
+    document.getElementById('dot').className='dot on';
+    document.getElementById('sttext').textContent='Escuchando — '+cfg.name;
+  }catch(err){alert('Micrófono no disponible: '+err.message);}
+}
+
+function stop(){
+  [proc,analyser,src].forEach(n=>{if(n){n.disconnect();}});
+  if(ctx) ctx.close();
+  proc=analyser=src=ctx=null;
+  running=false;
+  document.querySelectorAll('.sc-card').forEach(c=>c.classList.remove('locked'));
+  document.getElementById('btnStart').disabled=false;
+  document.getElementById('btnStop').disabled=true;
+  document.getElementById('refHz').disabled=false;
+  document.getElementById('dot').className='dot';
+  document.getElementById('sttext').textContent='Parado';
+  updateNow(null);
+  renderStats();
+}
+
+function updateNow(note,freq,conf){
+  const ne=document.getElementById('noteName');
+  const he=document.getElementById('noteHz');
+  const ce=document.getElementById('centsVal');
+  const nd=document.getElementById('needle');
+  const co=document.getElementById('noteConf');
+  if(!note){
+    ne.textContent='—';he.textContent='— Hz';
+    ce.textContent='— ¢';ce.className='cents-big off';
+    nd.style.left='50%';nd.className='m-needle';
+    co.textContent='—';co.style.color='#4b5563';return;
+  }
+  const thr=getThr();
+  ne.textContent=note.name;
+  he.textContent=freq.toFixed(1)+' Hz';
+  const c=note.cents,good=Math.abs(c)<thr;
+  ce.textContent=(c>=0?'+':'')+c.toFixed(1)+' ¢';
+  ce.className='cents-big '+(good?'good':'bad');
+  nd.style.left=Math.max(2,Math.min(98,50+(c/50)*50))+'%';
+  nd.className='m-needle '+(good?'good':'bad');
+  if(conf!==undefined){
+    const cp=Math.round(conf*100);
+    co.textContent='conf '+cp+'%';
+    co.style.color=cp>68?'#4ade80':cp>50?'#fbbf24':'#f87171';
+  }
+}
+
+// ─── Estadísticas ──────────────────────────────────────────────────────────
+function median(arr){
+  const s=[...arr].sort((a,b)=>a-b),m=Math.floor(s.length/2);
+  return s.length%2?s[m]:(s[m-1]+s[m])/2;
+}
+
+function trimmedMean(arr,pct,sigmaThreshold){
+  if(arr.length<4) return arr.reduce((a,b)=>a+b,0)/arr.length;
+  // Paso 1: trim porcentual
+  const s=[...arr].sort((a,b)=>a-b);
+  const cut=Math.max(1,Math.floor(s.length*pct));
+  let t=s.slice(cut,s.length-cut);
+  // Paso 2: descartar outliers por sigma
+  const m=t.reduce((a,b)=>a+b,0)/t.length;
+  const std=Math.sqrt(t.reduce((a,b)=>a+(b-m)**2,0)/t.length);
+  t=t.filter(v=>Math.abs(v-m)<sigmaThreshold*std);
+  return t.length>0?t.reduce((a,b)=>a+b,0)/t.length:m;
+}
+
+function globalOffset(){
+  const all=[];
+  STAT_NOTES.forEach(n=>all.push(...stats[n.st]));
+  return all.length>=10?median(all):null;
+}
+
+function renderStats(){
+  const wrap=document.getElementById('statsWrap');
+  const badge=document.getElementById('badge');
+  const banner=document.getElementById('offsetBanner');
+  const total=Object.values(stats).reduce((a,b)=>a+b.length,0);
+  if(total<5){wrap.innerHTML='<div class="empty">Toca para acumular datos…</div>';return;}
+
+  const cfg=getCfg(), thr=getThr(), offset=globalOffset();
+
+  badge.style.display='inline-block';
+  badge.textContent=total+' muestras';
+
+  if(offset!==null){
+    banner.style.display='block';
+    const sign=offset>=0?'+':'';
+    document.getElementById('obValue').textContent=sign+offset.toFixed(1)+' ¢';
+    if(Math.abs(offset)<thr){
+      banner.className='offset-banner ok';
+      document.getElementById('obValue').className='ob-value ok';
+      document.getElementById('obSub').textContent='Gaita bien afinada globalmente vs '+getRef()+' Hz';
+    } else if(offset>0){
+      banner.className='offset-banner hi';
+      document.getElementById('obValue').className='ob-value hi';
+      document.getElementById('obSub').textContent='Gaita alta globalmente · baja presión de bolsa o ajusta el tudel hacia dentro';
+    } else {
+      banner.className='offset-banner lo';
+      document.getElementById('obValue').className='ob-value lo';
+      document.getElementById('obSub').textContent='Gaita baja globalmente · sube presión de bolsa o ajusta el tudel hacia fuera';
+    }
+  }
+
+  const BINS=20,BW=5,BMIN=-50;
+  let gmax=1;
+  const hists={};
+  STAT_NOTES.forEach(n=>{
+    const v=stats[n.st]; if(!v.length){hists[n.st]=null;return;}
+    const h=new Array(BINS).fill(0);
+    v.forEach(x=>{const bi=Math.min(BINS-1,Math.max(0,Math.floor((x-BMIN)/BW)));h[bi]++;});
+    hists[n.st]=h; gmax=Math.max(gmax,...h);
+  });
+
+  let html='<table><thead><tr><th>Nota</th><th>N</th>'
+    +'<th title="Media filtrada vs referencia absoluta">vs ref.</th>'
+    +'<th title="Desviación vs offset global — corrección en el punteiro">vs offset ★</th>'
+    +'<th title="Desviación estándar tras filtrar outliers">σ</th>'
+    +'<th>Distribución</th><th>Veredicto</th></tr></thead><tbody>';
+
+  STAT_NOTES.forEach(n=>{
+    const vals=stats[n.st];
+    if(!vals.length){
+      html+=`<tr><td class="n-name">${n.name}</td><td class="n-count">—</td><td>—</td><td>—</td><td>—</td><td></td><td><span class="verdict vd-few">Sin datos</span></td></tr>`;
+      return;
+    }
+    const cnt=vals.length;
+    const mean=trimmedMean(vals,cfg.trimPct,cfg.outlierSigma);
+    const std=Math.sqrt(vals.reduce((a,b)=>a+(b-mean)**2,0)/cnt);
+    const rel=offset!==null?mean-offset:null;
+    const sign=mean>=0?'+':'';
+    const absClass=Math.abs(mean)<thr?'v-ok':mean>0?'v-hi':'v-lo';
+    let relCell='—',relClass='v-off';
+    if(rel!==null){
+      relClass=Math.abs(rel)<thr?'v-ok':rel>0?'v-hi':'v-lo';
+      relCell=(rel>=0?'+':'')+rel.toFixed(1)+'¢';
+    }
+    let verdict,vclass,flagRow='';
+    if(cnt<cfg.minSamples){ verdict='Pocas muestras'; vclass='vd-few'; }
+    else if(rel!==null&&Math.abs(rel)>=thr){
+      flagRow='flag-row';
+      if(std>20){ verdict='Inestable+desviada'; vclass='vd-var'; }
+      else if(rel>0){ verdict='↑ corregir −'+Math.round(rel)+'¢'; vclass='vd-hi'; }
+      else { verdict='↓ corregir +'+Math.abs(Math.round(rel))+'¢'; vclass='vd-lo'; }
+    } else if(std>20){ verdict='Inestable σ='+std.toFixed(0)+'¢'; vclass='vd-var'; }
+    else { verdict='En línea ✓'; vclass='vd-ok'; }
+
+    const h=hists[n.st]; const MAXH=14; let bars='';
+    if(h) h.forEach((c,i)=>{
+      const bc=BMIN+i*BW+BW/2;
+      const bh=c===0?0:Math.max(2,Math.round((c/gmax)*MAXH));
+      bars+=`<div class="${bc>thr?'hbar hi':bc<-thr?'hbar lo':'hbar ok'}" style="width:5px;height:${bh}px" title="${bc>=0?'+':''}${bc.toFixed(0)}¢: ${c}"></div>`;
+    });
+    const lo=vals.filter(v=>v<-thr).length,hi=vals.filter(v=>v>thr).length,ok=cnt-lo-hi;
+
+    html+=`<tr class="${flagRow}">
+      <td class="n-name">${n.name}</td><td class="n-count">${cnt}</td>
+      <td class="col-abs ${absClass}">${sign}${mean.toFixed(1)}¢</td>
+      <td class="col-rel ${relClass}">${relCell}</td>
+      <td class="col-std v-off">${std.toFixed(1)}¢</td>
+      <td class="hist-cell"><div class="hist-wrap">${bars}</div>
+        <div class="dist-txt"><span class="dist-lo">↓${lo}</span><span class="dist-ok"> ✓${ok}</span><span class="dist-hi"> ↑${hi}</span></div>
+      </td>
+      <td><span class="verdict ${vclass}">${verdict}</span></td>
+    </tr>`;
+  });
+
+  html+='</tbody></table>';
+  wrap.innerHTML=html;
+  const tot=totalAcc+totalRej;
+  document.getElementById('rejectInfo').textContent=
+    `${totalRej} rechazadas (${tot>0?Math.round(totalRej/tot*100):0}%) · escenario: ${getCfg().name}`;
+}
+
+document.getElementById('btnStart').addEventListener('click',start);
+document.getElementById('btnStop').addEventListener('click',stop);
+document.getElementById('btnClear').addEventListener('click',()=>{
+  if(running) return;
+  STAT_NOTES.forEach(n=>stats[n.st]=[]);
+  totalAcc=0;totalRej=0;freqQueue=[];lastAccFreq=0;
+  document.getElementById('scount').textContent='0 ac · 0 rech';
+  document.getElementById('badge').style.display='none';
+  document.getElementById('offsetBanner').style.display='none';
+  document.getElementById('statsWrap').innerHTML='<div class="empty">Selecciona escenario e inicia</div>';
+  document.getElementById('rejectInfo').textContent='';
+});
+</script>
+</body>
+</html>
