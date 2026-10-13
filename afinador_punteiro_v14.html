@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Afinador de punteiro · v14</title>
+<style>
+  :root{--bg:#10141a;--card:#1a212b;--line:#2b3644;--tx:#e8edf2;--mut:#8ea0b3;--ok:#43a047;--mid:#f9a825;--bad:#e53935;--acc:#1e88e5}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,sans-serif}
+  .app{max-width:480px;margin:0 auto;padding:14px 14px 40px}
+  header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+  h1{font-size:18px;margin:0;font-weight:600}
+  #resumen{font-size:12px;color:var(--mut)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px}
+  .gauge{text-align:center}
+  .nota{font-size:64px;font-weight:700;line-height:1;letter-spacing:-1px}
+  .estnota{font-size:15px;margin:4px 0 0;min-height:20px;color:var(--mut)}
+  svg{display:block;margin:6px auto 0;max-width:340px}
+  #needle{transform-origin:150px 150px;transform-box:view-box;transition:transform .7s cubic-bezier(.2,.8,.2,1),opacity .3s}
+  .datos{display:flex;justify-content:space-around;margin-top:6px}
+  .datos div{display:flex;flex-direction:column}
+  .datos span{font-size:22px;font-weight:600}
+  .datos small{font-size:11px;color:var(--mut)}
+  .meta{font-size:13px;color:var(--mut);margin-top:10px;min-height:34px;line-height:1.4}
+  .comun{font-size:14px;line-height:1.45;color:var(--tx);margin:0 0 10px}
+  .comun small{display:block;margin-top:3px;font-size:12px;color:var(--mut)}
+  .acciones{display:flex;gap:8px;margin-bottom:8px}
+  button,label.btn2{font:inherit;border:0;border-radius:12px;cursor:pointer;color:#fff}
+  .rec{flex:1;background:var(--bad);padding:14px;font-size:16px;font-weight:600}
+  .rec.on{background:#b71c1c;animation:pulso 1s infinite}
+  @keyframes pulso{50%{opacity:.65}}
+  label.btn2{flex:1;background:#37474f;padding:14px;font-size:15px;text-align:center}
+  button:disabled{opacity:.5}
+  #estado{font-size:13px;color:var(--mut);margin:4px 2px 12px;min-height:18px;line-height:1.4}
+  h2{font-size:13px;color:var(--mut);margin:0 0 8px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+  .chip{background:#232c38;color:var(--tx);border:2px solid var(--line);border-radius:10px;padding:5px 9px;font-size:13px;display:flex;flex-direction:column;align-items:center;min-width:48px}
+  .chip b{font-size:14px} .chip span{font-size:12px}
+  .chip.sel{background:#2f3b4a}
+  canvas{width:100%;display:block;cursor:pointer}
+  .leyenda{font-size:11px;color:var(--mut);margin-top:6px}
+  details summary{cursor:pointer;font-size:14px;color:var(--tx)}
+  details .fila{margin:10px 0;font-size:13px;color:var(--tx);line-height:1.4}
+  details .nota-peq{font-size:12px;color:var(--mut)}
+  input[type=number],select{background:#10141a;color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:6px;font-size:14px}
+  input[type=number]{width:92px}
+  .peq{background:#37474f;color:#fff;border:0;padding:6px 10px;font-size:13px;border-radius:8px}
+  table{width:100%;border-collapse:collapse}
+  td,th{padding:3px 4px;text-align:left;font-size:13px}
+  th{color:var(--mut);font-weight:500}
+  small{color:var(--mut)}
+</style>
+</head>
+<body>
+<div class="app">
+  <header><h1>Afinador de punteiro <small>v14 · en directo</small></h1><div id="resumen"></div></header>
+
+  <section class="card gauge">
+    <div id="nota" class="nota">--</div>
+    <div id="estnota" class="estnota">Graba o carga una melodía</div>
+    <svg viewBox="0 0 300 172" width="100%">
+      <g fill="none" stroke-width="16">
+        <path d="M30 150 A120 120 0 0 1 79.47 52.92" stroke="#e53935"/>
+        <path d="M79.47 52.92 A120 120 0 0 1 112.92 35.87" stroke="#f9a825"/>
+        <path d="M112.92 35.87 A120 120 0 0 1 187.08 35.87" stroke="#43a047"/>
+        <path d="M187.08 35.87 A120 120 0 0 1 220.53 52.92" stroke="#f9a825"/>
+        <path d="M220.53 52.92 A120 120 0 0 1 270 150" stroke="#e53935"/>
+      </g>
+      <g fill="#8ea0b3" font-size="11" text-anchor="middle">
+        <text x="58" y="154">-50</text><text x="95.9" y="79">-20</text><text x="150" y="62">0</text>
+        <text x="204" y="79">+20</text><text x="242" y="154">+50</text>
+      </g>
+      <g id="needle" style="opacity:.25">
+        <line x1="150" y1="150" x2="150" y2="46" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="150" cy="150" r="8" fill="#fff"/>
+      </g>
+    </svg>
+    <div class="datos">
+      <div><span id="hzM">--</span><small>medida (Hz)</small></div>
+      <div><span id="cents">--</span><small>desviación (¢)</small></div>
+      <div><span id="hzO">--</span><small>objetivo (Hz)</small></div>
+    </div>
+    <div id="meta" class="meta"></div>
+  </section>
+
+  <div class="acciones">
+    <button id="btn" class="rec">● Grabar</button>
+    <label class="btn2">Cargar audio<input id="fichero" type="file" accept="audio/*" hidden></label>
+  </div>
+  <div id="estado">Pulsa Grabar para ver la afinación al tocar; el informe completo aparece al parar.</div>
+
+  <section class="card">
+    <h2>Notas del punteiro</h2>
+    <p id="comun" class="comun">La desviación común aparecerá al analizar una grabación.<small>Solo cuenta notas con 8 apariciones o más y una dispersión de hasta 15 ¢; las inestables siguen visibles, pero no alteran el ajuste común.</small></p>
+    <div id="chips" class="chips"></div>
+    <canvas id="cv"></canvas>
+    <div class="leyenda">Toca una nota para ver su aguja. Barras = desviación en ¢ · franja verde = ±10 ¢ · raya clara = grabación anterior · gris = pocas muestras o medida inestable</div>
+  </section>
+
+  <details class="card">
+    <summary>Ajustes (referencia, tonalidad, notas, informe)</summary>
+    <div class="fila">Referencia A (Hz): <input id="refA" type="number" step="0.1" value="440">
+      <button class="peq" id="b440">440</button> <button class="peq" id="b442">442</button></div>
+    <div class="fila nota-peq">Con calor y sequedad la afinación sube (hasta A≈445); con frío y humedad baja (≈436). La guía fija A=440 en condiciones ideales (20 ºC, 60 % de humedad).</div>
+    <div class="fila"><label><input type="checkbox" id="ancla"> Anclar a la tónica medida</label>
+      <div class="nota-peq">La guía dice que lo importante es la compensación dentro de la escala, no la frecuencia absoluta. Con esto, todas las notas se miden respecto a la tónica y se muestra la A equivalente.</div></div>
+    <div class="fila">Tonalidad: <select id="tono"></select></div>
+    <div class="fila"><label><input type="checkbox" id="justa" checked> Afinación natural (no temperada)</label>
+      <div class="nota-peq">Los objetivos iniciales son orientativos. Edita el ajuste (¢) de cada nota para adaptarlo a tu punteiro; la desviación común se calcula respecto a esos objetivos.</div></div>
+    <div class="fila"><label><input type="checkbox" id="nat" checked> La melodía solo usa notas naturales (oculta bemoles)</label>
+      <div class="nota-peq">Desmárcala para afinar escalas con Mib, Lab y Sib (modo menor).</div></div>
+    <div class="fila">Modo: <select id="modo">
+      <option value="ritmo">Melodía a ritmo de canción</option>
+      <option value="largas">Notas largas (tónica, quinta, octava)</option></select></div>
+    <table><thead><tr><th>Nota</th><th>Objetivo (Hz)</th><th>Ajuste (¢)</th><th></th></tr></thead><tbody id="notas"></tbody></table>
+    <div class="fila">Añadir nota: <select id="anota"></select> <select id="aoct"></select>
+      <button class="peq" id="bAdd">Añadir</button></div>
+    <div class="fila">Informe: <button class="peq" id="bInf">Guardar informe</button>
+      <label class="peq" style="display:inline-block;cursor:pointer">Cargar informe anterior<input id="fInf" type="file" accept=".txt,text/plain" hidden></label></div>
+    <div class="fila nota-peq">Guarda el resultado de cada sesión y cárgalo después para comparar antes y después de ajustar, aunque cierres la página.</div>
+  </details>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const tick = () => new Promise(r => setTimeout(r));
+const med = a => { a = [...a].sort((p, q) => p - q); const n = a.length; return n % 2 ? a[(n - 1) / 2] : (a[n / 2 - 1] + a[n / 2]) / 2; };
+const NOM = ["Do","Reb","Re","Mib","Mi","Fa","Solb","Sol","Lab","La","Sib","Si"];
+const nom = m => NOM[((m % 12) + 12) % 12] + (Math.floor(m / 12) - 1);
+const hzDe = (m, A) => A * Math.pow(2, (m - 69) / 12);
+const LARGAS = { wMs:46, hMs:23, thr:.15, fb:false, fbThr:.3, minMs:115, trim:1, gap:0, maxDesv:60, rms:.01 };
+const RITMO  = { wMs:35, hMs:16, thr:.15, fb:true, fbThr:.3, minMs:60, trim:1, gap:2, maxDesv:80, rms:.01 };
+// Objetivos en cents sobre la temperada, por semitonos desde la tónica.
+// Guía (Pepe Vaamonde): 3ª mayor -14, 5ª +3, 3ª menor como máximo +20 (uso +10: la zona ±10 cubre 0…+20), 6ª menor -20, 7ª menor -20, octava 0.
+// 2ª, 4ª, 6ª y 7ª mayores: proporciones puras supuestas (la guía dice que salen bien por construcción).
+const OBJ = { 0:0, 2:3.9, 3:10, 4:-14, 5:-2, 7:3, 8:-20, 9:-15.6, 10:-20, 11:-11.7 };
+const CLAVE = new Set([0, 3, 4, 7, 8, 10]);
+const NATURAL = [0, 2, 4, 5, 7, 9, 11];
+const PLANTILLA = [-1, 0, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12];
+const tonicMidi = pc => 70 + ((pc - 10 + 12) % 12);
+const tm = () => tonicMidi(+$("tono").value);
+const ivDe = m => (((m - tm()) % 12) + 12) % 12;
+
+/* ---------- Estado de la interfaz ---------- */
+let RES = [], sel = -1, prev = {}, ANT = {}, comunActual = null;
+const est = t => $("estado").textContent = t;
+const DISP_MAX = 15; // dispersión entre apariciones; por encima no se usa para el ajuste común
+const fiable = r => r.cents != null && r.n >= 8 && r.disp <= DISP_MAX;
+const color = r => (!fiable(r)) ? "#78909c" : Math.abs(r.cents) <= 10 ? "#43a047" : Math.abs(r.cents) <= 20 ? "#f9a825" : "#e53935";
+const sg = v => (v >= 0 ? "+" : "") + v.toFixed(1);
+const reiniciarComp = () => { prev = {}; ANT = {}; };   // los cents dejan de ser comparables al cambiar la referencia
+
+/* ---------- Tabla de notas (ajustes) ---------- */
+const filas = () => [...$("notas").querySelectorAll("tr")];
+const refA = () => parseFloat($("refA").value) || 440;
+function addRow(m, of = 0) {
+  if (filas().some(r => +r.dataset.midi === m)) return;
+  const pc = ((m % 12) + 12) % 12, tr = document.createElement("tr");
+  tr.dataset.midi = m;
+  tr.innerHTML = `<td><label><input type="checkbox" class="on" checked> ${NOM[pc]}<small>${Math.floor(m / 12) - 1}</small></label></td>
+    <td><input type="number" class="hz" step="0.01"></td><td><input type="number" class="of" step="0.5"></td>
+    <td><button class="peq x">✕</button></td>`;
+  tr.querySelector(".of").value = of;
+  tr.querySelector(".hz").value = hzDe(m, refA()).toFixed(2);
+  tr.querySelector(".x").onclick = () => { tr.remove(); placeholder(); };
+  tr.querySelectorAll("input").forEach(i => i.onchange = () => { reiniciarComp(); placeholder(); });
+  const sig = filas().find(r => +r.dataset.midi > m);
+  $("notas").insertBefore(tr, sig || null);
+}
+function rellenar() { const A = refA(); filas().forEach(tr => tr.querySelector(".hz").value = hzDe(+tr.dataset.midi, A).toFixed(2)); }
+function leerNotas() {
+  const nat = $("nat").checked;
+  return filas().map(tr => {
+    const m = +tr.dataset.midi, hz = parseFloat(tr.querySelector(".hz").value) || 0, of = parseFloat(tr.querySelector(".of").value) || 0;
+    const oculta = nat && !NATURAL.includes(ivDe(m));
+    return { nombre: nom(m), midi: m, on: tr.querySelector(".on").checked && !oculta, hz: hz * Math.pow(2, of / 1200) };
+  });
+}
+NOM.forEach((n, i) => { $("tono").add(new Option(n, i)); $("anota").add(new Option(n, i)); });
+[3, 4, 5, 6].forEach(o => $("aoct").add(new Option("octava " + o, o)));
+$("aoct").value = 5; $("tono").value = "0";
+
+function resumen() { $("resumen").textContent = `${NOM[+$("tono").value]} · A=${refA()} Hz${$("ancla").checked ? " (anclada)" : ""} · ${$("justa").checked ? "natural" : "temperada"}`; }
+function aplicarOffsets() {
+  const j = $("justa").checked;
+  filas().forEach(tr => { const o = OBJ[ivDe(+tr.dataset.midi)]; tr.querySelector(".of").value = j ? (o !== undefined ? o : 0) : 0; });
+  resumen(); placeholder();
+}
+function aplicarTono() {
+  filas().forEach(r => r.remove());
+  PLANTILLA.forEach(iv => addRow(tm() + iv));
+  reiniciarComp(); aplicarOffsets();
+}
+const cambioRef = () => { rellenar(); resumen(); reiniciarComp(); placeholder(); };
+$("tono").onchange = aplicarTono;
+$("justa").onchange = () => { reiniciarComp(); aplicarOffsets(); };
+$("nat").onchange = placeholder;
+$("ancla").onchange = () => { reiniciarComp(); resumen(); };
+$("refA").onchange = cambioRef;
+$("b440").onclick = () => { $("refA").value = 440; cambioRef(); };
+$("b442").onclick = () => { $("refA").value = 442; cambioRef(); };
+$("bAdd").onclick = () => { addRow(12 * (+$("aoct").value + 1) + +$("anota").value); aplicarOffsets(); };
+
+/* ---------- Consejos (según la guía) ---------- */
+function consejo(r) {
+  const iv = ivDe(r.midi), a = Math.abs(r.cents), up = r.cents > 0, qo = iv === 7 || (iv === 0 && r.midi > tm());
+  if (r.n < 8) return ["Pocas muestras", "Toca esta nota más veces para una medida fiable."];
+  if (r.disp > DISP_MAX) return ["Medida inestable", `Esta nota varía mucho entre apariciones (±${r.disp.toFixed(1)} ¢). No entra en el cálculo común; prueba el modo «Notas largas» y evita grabar acompañamiento.`];
+  if (a <= 10) return ["Afinada", "No hace falta tocar nada."];
+  if (qo) return up
+    ? ["Alta", "Quinta/octava altas (guía): separa la caña 1-2 mm añadiendo hilo alrededor; para el ajuste fino, cera sobre el agujero."]
+    : ["Baja", "Quinta/octava bajas (guía): saca la caña, retira unas vueltas de hilo y vuelve a colocarla."];
+  if (iv === 3 || iv === 8 || iv === 10) return up
+    ? ["Alta", "Grado menor alto (guía): endurece la textura abriendo algo la boca de la caña."]
+    : ["Baja", "Grado menor bajo: la guía no indica remedio; quitar un poco de cera de ese agujero sube la nota."];
+  const base = up ? "Un poco de cera sobre el agujero la baja." : "Quitar un poco de cera sube la nota.";
+  return [up ? "Alta" : "Baja", base + (CLAVE.has(iv) ? "" : " Según la guía esta nota debería salir bien por construcción: si se aparta mucho, revisa el agujero o la caña.")];
+}
+
+/* ---------- Aguja, chips y gráfica ---------- */
+function placeholder() {
+  comunActual = null;
+  $("comun").innerHTML = "La desviación común aparecerá al analizar una grabación.<small>Solo cuenta notas con 8 apariciones o más y una dispersión de hasta 15 ¢; las inestables siguen visibles, pero no alteran el ajuste común.</small>";
+  RES = leerNotas().filter(n => n.on).map(n => ({ nombre: n.nombre, midi: n.midi, obj: n.hz, hz: null, cents: null, disp: null, n: 0, desc: 0 }));
+  seleccionar(-1);
+}
+function seleccionar(i) {
+  sel = i; const r = RES[i], nd = $("needle");
+  if (!r) {
+    $("nota").textContent = "--"; $("nota").style.color = "";
+    $("estnota").textContent = "Graba o carga una melodía"; $("estnota").style.color = "";
+    $("hzM").textContent = $("cents").textContent = $("hzO").textContent = "--"; $("meta").textContent = "";
+    $("cents").style.color = ""; nd.style.opacity = .25; nd.style.transform = "rotate(0deg)";
+  } else if (r.cents == null) {
+    $("nota").textContent = r.nombre; $("nota").style.color = "";
+    $("estnota").textContent = "Sin datos en esta grabación"; $("estnota").style.color = "";
+    $("hzM").textContent = "--"; $("cents").textContent = "--"; $("cents").style.color = ""; $("hzO").textContent = r.obj.toFixed(1);
+    $("meta").textContent = "Esta nota no aparece, o no se detectó, en la melodía."; nd.style.opacity = .25; nd.style.transform = "rotate(0deg)";
+  } else {
+    const c = color(r), a = Math.abs(r.cents), [st, ad] = consejo(r);
+    $("nota").textContent = r.nombre; $("nota").style.color = c;
+    $("estnota").textContent = st; $("estnota").style.color = c;
+    $("hzM").textContent = r.hz.toFixed(1); $("cents").textContent = sg(r.cents); $("cents").style.color = c; $("hzO").textContent = r.obj.toFixed(1);
+    let cmp = ""; if (ANT[r.nombre] != null) { const dl = a - Math.abs(ANT[r.nombre]); cmp = ` · Antes ${sg(ANT[r.nombre])} ¢ (${dl < 0 ? "mejor" : "peor"} ${Math.abs(dl).toFixed(1)} ¢)`; }
+    const residual = r.residual == null ? "" : `Descontando la desviación común: ${sg(r.residual)} ¢. `;
+    $("meta").textContent = `${ad} ${residual}Variación ±${r.disp.toFixed(1)} ¢ (media ±${(r.disp / Math.sqrt(r.n)).toFixed(1)} ¢) · ${r.n} apariciones${r.desc ? ` (${r.desc} descartadas por atípicas)` : ""}${cmp}`;
+    nd.style.opacity = 1; nd.style.transform = `rotate(${Math.max(-50, Math.min(50, r.cents)) / 50 * 90}deg)`;
+  }
+  pintarChips(); dibujar();
+}
+function pintarChips() {
+  const c = $("chips"); c.innerHTML = "";
+  RES.forEach((r, i) => {
+    const b = document.createElement("button"); b.className = "chip" + (i === sel ? " sel" : "");
+    b.style.borderColor = color(r);
+    b.innerHTML = `<b>${r.nombre}</b><span style="color:${color(r)}">${r.cents == null ? "–" : (r.cents >= 0 ? "+" : "") + r.cents.toFixed(0)}</span>`;
+    b.onclick = () => seleccionar(i); c.appendChild(b);
+  });
+}
+function dibujar() {
+  const cv = $("cv"), dpr = devicePixelRatio || 1, w = cv.clientWidth, h = 230;
+  cv.width = w * dpr; cv.height = h * dpr; cv.style.height = h + "px";
+  const g = cv.getContext("2d"); g.scale(dpr, dpr); g.clearRect(0, 0, w, h);
+  const n = Math.max(1, RES.length), top = 16, bot = h - 28, mid = (top + bot) / 2, R = 30, esc = (bot - top) / 2 / R, slot = w / n;
+  g.fillStyle = "rgba(67,160,71,.18)"; g.fillRect(0, mid - 10 * esc, w, 20 * esc);
+  g.strokeStyle = "#3a4654"; g.beginPath(); g.moveTo(0, mid); g.lineTo(w, mid); g.stroke();
+  g.textAlign = "center";
+  RES.forEach((r, i) => {
+    const x = i * slot + slot / 2, bw = Math.min(30, slot * .6);
+    if (i === sel) { g.fillStyle = "rgba(255,255,255,.07)"; g.fillRect(i * slot, 0, slot, h); }
+    g.font = "11px system-ui,sans-serif"; g.fillStyle = i === sel ? "#fff" : "#9fb0c0"; g.fillText(r.nombre, x, h - 10);
+    if (r.cents == null) { g.fillStyle = "#56626f"; g.fillText("–", x, mid - 5); return; }
+    const v = Math.max(-R, Math.min(R, r.cents)) * esc;
+    g.fillStyle = color(r); g.fillRect(x - bw / 2, Math.min(mid, mid - v), bw, Math.abs(v) || 1);
+    g.fillStyle = "#e8edf2"; g.fillText((r.cents >= 0 ? "+" : "") + r.cents.toFixed(0), x, r.cents >= 0 ? mid - v - 5 : mid - v + 13);
+    const p = ANT[r.nombre];
+    if (p != null) { const pv = Math.max(-R, Math.min(R, p)) * esc; g.strokeStyle = "#cfd8dc"; g.lineWidth = 2; g.beginPath(); g.moveTo(x - bw / 2 - 3, mid - pv); g.lineTo(x + bw / 2 + 3, mid - pv); g.stroke(); g.lineWidth = 1; }
+  });
+}
+$("cv").onclick = e => { const rc = $("cv").getBoundingClientRect(), i = Math.floor((e.clientX - rc.left) / (rc.width / Math.max(1, RES.length))); if (RES[i]) seleccionar(i); };
+window.addEventListener("resize", dibujar);
+
+/* ---------- Audio: decodificación y nivel ---------- */
+const decodificar = async buf => {
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  // AudioContext aplica un remuestreo de banda limitada al decodificar. 22.05 kHz
+  // conserva margen suficiente para el punteiro y reduce ~4 veces el coste del YIN.
+  for (const sampleRate of [22050, undefined]) {
+    let C;
+    try {
+      C = new AudioCtx(sampleRate ? { sampleRate } : undefined);
+      const b = await C.decodeAudioData(buf.slice(0));
+      await C.close?.();
+      if (sampleRate && b.sampleRate !== sampleRate) continue;
+      return b;
+    } catch (e) {
+      try { await C?.close?.(); } catch {}
+      if (!sampleRate) throw e || new Error("No se pudo decodificar el audio");
+    }
+  }
+  throw new Error("No se pudo decodificar el audio");
+};
+// Lleva el nivel de los tramos fuertes a un valor estable para que la puerta de ruido funcione con grabaciones flojas
+function normalizar(x) {
+  const B = 1024, nb = Math.floor(x.length / B), r = [];
+  for (let b = 0; b < nb; b++) { let e = 0; for (let j = 0; j < B; j++) { const v = x[b * B + j]; e += v * v; } r.push(Math.sqrt(e / B)); }
+  if (!r.length) return x;
+  r.sort((p, q) => p - q);
+  const p90 = r[Math.floor(r.length * .9)];
+  if (!(p90 > 0)) return x;
+  const k = Math.min(30, .2 / p90), y = new Float32Array(x.length);
+  for (let i = 0; i < x.length; i++) y[i] = x[i] * k;
+  return y;
+}
+
+/* ---------- Analizador (YIN + segmentación) ---------- */
+async function analizar(x, sr, notas, P, cb) {
+  const act = notas.filter(n => n.on && n.hz > 0);
+  if (!act.length) return [];
+  const hzs = act.map(n => n.hz);
+  const fLo = Math.max(150, .75 * Math.min(...hzs)), fHi = Math.min(2000, 1.35 * Math.max(...hzs));
+  const W = Math.round(P.wMs * sr / 1000), H = Math.max(64, Math.round(P.hMs * sr / 1000));
+  const tauMin = Math.max(2, Math.floor(sr / fHi)), tauMax = Math.floor(sr / fLo);
+  const d = new Float64Array(tauMax + 2), c = new Float64Array(tauMax + 2);
+  const last = x.length - (W + tauMax + 2);
+
+  function yin(ini) {
+    for (let t = 1; t <= tauMax; t++) { let s = 0; for (let j = 0; j < W; j++) { const q = x[ini + j] - x[ini + j + t]; s += q * q; } d[t] = s; }
+    c[0] = 1; let a = 0;
+    for (let t = 1; t <= tauMax; t++) { a += d[t]; c[t] = a > 0 ? d[t] * t / a : 1; }
+    let tau = -1;
+    for (let t = tauMin; t < tauMax; t++) if (c[t] < P.thr) { while (t + 1 < tauMax && c[t + 1] < c[t]) t++; tau = t; break; }
+    if (tau < 0 && P.fb) {
+      let m = 1, mt = -1;
+      for (let t = tauMin; t < tauMax; t++) if (c[t] < m) { m = c[t]; mt = t; }
+      if (mt > 0 && m < P.fbThr) {
+        tau = mt;
+        for (let t = tauMin; t < mt; t++) if (c[t] < m + .05 && c[t] < c[t - 1] && c[t] <= c[t + 1]) { tau = t; break; }
+      }
+    }
+    if (tau < 2 || tau >= tauMax) return null;
+    const a1 = c[tau - 1], b = c[tau], c2 = c[tau + 1], den = a1 - 2 * b + c2;
+    return sr / (tau + (den !== 0 ? .5 * (a1 - c2) / den : 0));
+  }
+  function clas(ini) {
+    let e = 0; for (let j = 0; j < W; j++) e += x[ini + j] * x[ini + j];
+    if (Math.sqrt(e / W) < P.rms) return null;
+    const f = yin(ini); if (!f) return null;
+    let b = -1, bc = 0;
+    act.forEach((n, k) => { const cs = 1200 * Math.log2(f / n.hz); if (b < 0 || Math.abs(cs) < Math.abs(bc)) { b = k; bc = cs; } });
+    return Math.abs(bc) <= P.maxDesv ? [b, bc] : null;
+  }
+  const F = [];
+  for (let pos = 0, k = 0; pos <= last; pos += H, k++) {
+    F.push(clas(pos));
+    if (cb && k % 50 === 0) { cb(Math.min(1, pos / last)); await tick(); }
+  }
+  const mf = Math.max(2, Math.ceil(P.minMs / P.hMs)), segs = [];
+  let i = 0;
+  while (i < F.length) {
+    const f = F[i]; if (!f) { i++; continue; }
+    const note = f[0]; let j = i, lastOk = i, gap = 0;
+    while (j < F.length) { const g = F[j]; if (g && g[0] === note) { lastOk = j; gap = 0; } else { gap++; if (gap > P.gap) break; } j++; }
+    const idx = []; for (let k = i; k <= lastOk; k++) if (F[k] && F[k][0] === note) idx.push(k);
+    const use = idx.slice(P.trim, idx.length - P.trim);
+    if (lastOk - i + 1 >= mf && use.length >= 2) segs.push({ k: note, c: med(use.map(k => F[k][1])) });
+    i = lastOk + 1;
+  }
+  const por = act.map(() => []); segs.forEach(s => por[s.k].push(s.c));
+  return act.map((n, k) => {
+    let l = por[k], desc = 0;
+    if (l.length >= 6) {                       // descarta apariciones a más de 30 ¢ de la mediana (confusiones con notas vecinas)
+      const m0 = med(l), f = l.filter(v => Math.abs(v - m0) <= 30);
+      desc = l.length - f.length; l = f;
+    }
+    if (!l.length) return { nombre: n.nombre, midi: n.midi, obj: n.hz, hz: null, cents: null, disp: null, n: 0, desc };
+    const m = l.reduce((p, q) => p + q, 0) / l.length, cm = med(l);
+    return { nombre: n.nombre, midi: n.midi, obj: n.hz, hz: n.hz * Math.pow(2, cm / 1200), cents: cm,
+      disp: l.length > 1 ? Math.sqrt(l.reduce((p, q) => p + (q - m) ** 2, 0) / (l.length - 1)) : 0, n: l.length, desc };
+  });
+}
+
+// Aísla el bucle YIN en un Worker: el análisis puede tardar, pero la interfaz
+// sigue desplazándose y mostrando el progreso. Se conserva el mismo analizador.
+function analizarEnWorker(x, sr, notas, P, cb) {
+  if (typeof Worker === "undefined" || typeof Blob === "undefined")
+    return analizar(x, sr, notas, P, cb);
+  const source = `const med=${med.toString()}; const tick=()=>new Promise(r=>setTimeout(r,0));
+    const analizar=${analizar.toString()};
+    self.onmessage=async e=>{ const {x,sr,notas,P}=e.data;
+      try { const result=await analizar(new Float32Array(x),sr,notas,P,p=>self.postMessage({progress:p}));
+        self.postMessage({result}); } catch(error) { self.postMessage({error:String(error&&error.message||error)}); }
+    };`;
+  const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
+  return new Promise((resolve, reject) => {
+    let worker;
+    try { worker = new Worker(url); } catch (error) { URL.revokeObjectURL(url); analizar(x, sr, notas, P, cb).then(resolve, reject); return; }
+    let terminado = false;
+    const fallback = error => {
+      if (terminado) return;
+      terminado = true; worker.terminate(); URL.revokeObjectURL(url);
+      // En algunos navegadores el Worker de Blob no está permitido al abrir un
+      // fichero local. El mismo analizador se ejecuta aquí como alternativa.
+      analizar(x, sr, notas, P, cb).then(resolve, reject);
+    };
+    worker.onmessage = e => {
+      if (e.data.progress != null) { cb?.(e.data.progress); return; }
+      if (terminado) return;
+      terminado = true; worker.terminate(); URL.revokeObjectURL(url);
+      e.data.error ? reject(new Error(e.data.error)) : resolve(e.data.result);
+    };
+    worker.onerror = e => fallback(e);
+    // Se transfiere una copia para poder repetir el análisis en el hilo principal
+    // si el navegador bloquea el Worker al cargarlo.
+    const workerData = x.slice();
+    try { worker.postMessage({ x: workerData.buffer, sr, notas, P }, [workerData.buffer]); }
+    catch (error) { fallback(error); }
+  });
+}
+
+/* ---------- Afinación en directo ---------- */
+// El Worker comparte las notas y parámetros del análisis final. Solo calcula
+// estimaciones cortas para el indicador; el informe se vuelve a calcular desde
+// toda la grabación al parar.
+const LIVE_PITCH_WORKER = `
+let sr=0, notes=[], P={}, W=0, H=0, tauMin=0, tauMax=0, data=new Float32Array(0), peakRms=0;
+function init(m){sr=m.sr;notes=m.notes.filter(n=>n.on&&n.hz>0);P=m.P;
+ const lo=Math.max(150,.75*Math.min(...notes.map(n=>n.hz))), hi=Math.min(2000,1.35*Math.max(...notes.map(n=>n.hz)));
+ W=Math.round(P.wMs*sr/1000); H=Math.max(64,Math.round(P.hMs*sr/1000));
+ tauMin=Math.max(2,Math.floor(sr/hi)); tauMax=Math.floor(sr/lo); data=new Float32Array(0);
+}
+function frame(at){let energy=0;for(let j=0;j<W;j++)energy+=data[at+j]*data[at+j];
+ const rms=Math.sqrt(energy/W); peakRms=Math.max(rms,peakRms*.995);
+ if(rms<Math.max(.0015,peakRms*.08))return {valid:false};
+ const d=new Float64Array(tauMax+2), c=new Float64Array(tauMax+2);
+ for(let t=1;t<=tauMax;t++){let s=0;for(let j=0;j<W;j++){const q=data[at+j]-data[at+j+t];s+=q*q;}d[t]=s;}
+ c[0]=1;let acc=0;for(let t=1;t<=tauMax;t++){acc+=d[t];c[t]=acc>0?d[t]*t/acc:1;}
+ let tau=-1;for(let t=tauMin;t<tauMax;t++)if(c[t]<P.thr){while(t+1<tauMax&&c[t+1]<c[t])t++;tau=t;break;}
+ if(tau<0&&P.fb){let min=1,mt=-1;for(let t=tauMin;t<tauMax;t++)if(c[t]<min){min=c[t];mt=t;}
+  if(mt>0&&min<P.fbThr){tau=mt;for(let t=tauMin;t<mt;t++)if(c[t]<min+.05&&c[t]<c[t-1]&&c[t]<=c[t+1]){tau=t;break;}}}
+ if(tau<2||tau>=tauMax||c[tau]>.30)return {valid:false};
+ const a=c[tau-1],b=c[tau],z=c[tau+1],den=a-2*b+z;
+ const hz=sr/(tau+(den!==0?.5*(a-z)/den:0));let best=-1, cents=0;
+ for(let k=0;k<notes.length;k++){const value=1200*Math.log2(hz/notes[k].hz);if(best<0||Math.abs(value)<Math.abs(cents)){best=k;cents=value;}}
+ return best>=0&&Math.abs(cents)<=P.maxDesv?{valid:true,midi:notes[best].midi,cents,hz,confidence:c[tau]}:{valid:false};
+}
+self.onmessage=e=>{const m=e.data;if(m.init){init(m);return;}
+ const block=new Float32Array(m.block), joined=new Float32Array(data.length+block.length);joined.set(data);joined.set(block,data.length);data=joined;
+ const frames=[];let pos=0;while(pos+W+tauMax+2<=data.length){frames.push(frame(pos));pos+=H;}data=data.slice(pos);
+ self.postMessage({frames});
+};`;
+const LIVE_WORKLET = `class TunerCapture extends AudioWorkletProcessor {
+ constructor(){super();this.block=new Float32Array(1024);this.used=0;}
+ process(inputs,outputs){const input=inputs[0]&&inputs[0][0];
+  if(input){let p=0;while(p<input.length){const n=Math.min(input.length-p,this.block.length-this.used);this.block.set(input.subarray(p,p+n),this.used);p+=n;this.used+=n;
+   if(this.used===this.block.length){const ready=this.block;this.block=new Float32Array(1024);this.used=0;this.port.postMessage(ready,[ready.buffer]);}}
+  }
+  for(const output of outputs)for(const channel of output)channel.fill(0);return true;
+ }
+}
+registerProcessor('tuner-capture',TunerCapture);`;
+
+let liveCtx=null, liveSource=null, liveNode=null, liveMute=null, liveWorker=null, liveWorkerUrl=null, liveModuleUrl=null;
+let liveRecent=[], liveLastUpdate=0, liveClearTimer=null;
+const LIVE_BLOCK=1024, LIVE_STABLE=3;
+function mostrarEnDirecto(p){
+  const a=Math.abs(p.cents), c=a<=10?"#43a047":a<=20?"#f9a825":"#e53935", nd=$("needle");
+  $("nota").textContent=p.nombre;$("nota").style.color=c;
+  $("estnota").textContent="En directo · estable";$("estnota").style.color=c;
+  $("hzM").textContent=p.hz.toFixed(1);$("cents").textContent=sg(p.cents);$("cents").style.color=c;
+  $("hzO").textContent=p.obj.toFixed(1);$("meta").textContent=`Lectura instantánea · variación ±${p.disp.toFixed(1)} ¢. El resumen final se calcula al parar.`;
+  nd.style.opacity=1;nd.style.transform=`rotate(${Math.max(-50,Math.min(50,p.cents))/50*90}deg)`;
+}
+function recibirFramesLive(frames){
+  for(const f of frames){
+    if(!f.valid)continue;
+    if(liveRecent.length&&liveRecent[liveRecent.length-1].midi!==f.midi)liveRecent=[];
+    liveRecent.push(f);if(liveRecent.length>7)liveRecent.shift();
+    if(liveRecent.length<LIVE_STABLE)continue;
+    const cents=med(liveRecent.map(x=>x.cents)), span=Math.max(...liveRecent.map(x=>x.cents))-Math.min(...liveRecent.map(x=>x.cents));
+    if(span>18)continue;
+    const note=leerNotas().find(n=>n.midi===f.midi);if(!note)continue;
+    mostrarEnDirecto({nombre:note.nombre,hz:note.hz*Math.pow(2,cents/1200),obj:note.hz,cents,disp:span/2,count:liveRecent.length});
+    liveLastUpdate=Date.now();
+  }
+}
+function enviarBloqueLive(block){if(liveWorker&&liveWorker.ready)liveWorker.postMessage({block:block.buffer},[block.buffer]);}
+async function iniciarLive(micStream){
+  const AudioCtx=window.AudioContext||window.webkitAudioContext;
+  try{liveCtx=new AudioCtx({sampleRate:22050});}catch{liveCtx=new AudioCtx();}
+  if(liveCtx.state==='suspended')await liveCtx.resume();
+  liveWorkerUrl=URL.createObjectURL(new Blob([LIVE_PITCH_WORKER],{type:'text/javascript'}));
+  liveWorker=new Worker(liveWorkerUrl);liveWorker.onmessage=e=>recibirFramesLive(e.data.frames||[]);
+  const P=$("modo").value==="largas"?LARGAS:RITMO;
+  liveWorker.postMessage({init:true,sr:liveCtx.sampleRate,notes:leerNotas(),P});liveWorker.ready=true;
+  liveSource=liveCtx.createMediaStreamSource(micStream);liveMute=liveCtx.createGain();liveMute.gain.value=0;
+  if(liveCtx.audioWorklet&&typeof AudioWorkletNode!=="undefined"){
+    try{
+      liveModuleUrl=URL.createObjectURL(new Blob([LIVE_WORKLET],{type:"text/javascript"}));
+      await liveCtx.audioWorklet.addModule(liveModuleUrl);
+      liveNode=new AudioWorkletNode(liveCtx,"tuner-capture",{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[1]});
+      liveNode.port.onmessage=e=>enviarBloqueLive(new Float32Array(e.data));
+    }catch{
+      if(liveNode){liveNode.disconnect();liveNode=null;}
+      liveNode=null;
+    }
+  }
+  if(!liveNode){
+    liveNode=liveCtx.createScriptProcessor(LIVE_BLOCK,1,1);
+    liveNode.onaudioprocess=e=>{enviarBloqueLive(e.inputBuffer.getChannelData(0).slice());e.outputBuffer.getChannelData(0).fill(0);};
+  }
+  liveSource.connect(liveNode);liveNode.connect(liveMute);liveMute.connect(liveCtx.destination);
+  liveRecent=[];liveLastUpdate=Date.now();clearInterval(liveClearTimer);
+  liveClearTimer=setInterval(()=>{if(Date.now()-liveLastUpdate>700){liveRecent=[];$("estnota").textContent="Escuchando…";$("meta").textContent="Toca una nota sostenida para leer su afinación.";}},250);
+  est("En directo · toca una nota sostenida; el resumen completo aparece al parar.");
+}
+function detenerLive(){
+  clearInterval(liveClearTimer);liveClearTimer=null;
+  try{liveNode?.disconnect();liveSource?.disconnect();liveMute?.disconnect();}catch{}
+  liveWorker?.terminate();liveWorker=null;liveNode=null;liveSource=null;liveMute=null;
+  if(liveWorkerUrl)URL.revokeObjectURL(liveWorkerUrl);if(liveModuleUrl)URL.revokeObjectURL(liveModuleUrl);
+  liveWorkerUrl=liveModuleUrl=null;if(liveCtx){liveCtx.close().catch(()=>{});liveCtx=null;}
+}
+
+/* ---------- Grabación / carga ---------- */
+let mediaRec = null, chunks = [], stream = null, timer = null;
+$("btn").onclick = async () => {
+  if (mediaRec && mediaRec.state === "recording") { mediaRec.stop(); return; }
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }); }
+  catch (e) { est("Micrófono no disponible (" + e.name + "). Usa «Cargar audio» o abre la página por HTTPS/localhost."); return; }
+  chunks = []; mediaRec = new MediaRecorder(stream);
+  mediaRec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+  mediaRec.onstop = async () => {
+    clearInterval(timer); detenerLive(); stream.getTracks().forEach(t => t.stop());
+    $("btn").classList.remove("on"); $("btn").textContent = "● Grabar otra vez";
+    procesar(await new Blob(chunks, { type: mediaRec.mimeType || "" }).arrayBuffer());
+  };
+  const t0 = Date.now();
+  mediaRec.start(); $("btn").classList.add("on"); est("Grabando… iniciando afinación en directo.");
+  try { await iniciarLive(stream); }
+  catch (e) { detenerLive(); est("Grabando; lectura en directo no disponible en este navegador. El análisis final seguirá funcionando."); }
+  const pinta = () => { const s = Math.floor((Date.now() - t0) / 1000); $("btn").textContent = `■ Parar y analizar (${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")})`; };
+  pinta(); timer = setInterval(pinta, 500);
+};
+$("fichero").onchange = async e => { if (e.target.files[0]) procesar(await e.target.files[0].arrayBuffer()); };
+
+async function procesar(buf) {
+  $("btn").disabled = true; est("Decodificando audio…");
+  try {
+    const ab = await decodificar(buf);
+    const x = normalizar(ab.getChannelData(0));
+    const res = await analizarEnWorker(x, ab.sampleRate, leerNotas(), $("modo").value === "largas" ? LARGAS : RITMO,
+      p => est("Analizando " + Math.round(p * 100) + "%"));
+    mostrar(res);
+  } catch (e) { est("Error: " + (e && e.message ? e.message : e)); }
+  $("btn").disabled = false;
+}
+
+function mostrar(res) {
+  const partes = [];
+  const fiablesIniciales = res.filter(fiable);
+  const comun = fiablesIniciales.length >= 2 ? med(fiablesIniciales.map(r => r.cents)) : null;
+  comunActual = comun;
+  const comunHz = comun == null ? null : refA() * Math.pow(2, comun / 1200);
+  res.forEach(r => { r.residual = r.cents == null || comun == null ? null : r.cents - comun; });
+  if ($("ancla").checked) {
+    const t = res.find(r => r.midi === tm() && r.cents != null && r.n >= 8);
+    if (t) {
+      const c0 = t.cents, k = Math.pow(2, c0 / 1200);
+      res.forEach(r => { r.obj *= k; if (r.cents != null) r.cents -= c0; });
+      partes.push(`A equivalente ≈ ${(refA() * k).toFixed(1)} Hz (tónica ${sg(c0)} ¢ sobre la referencia)`);
+    } else partes.push("No hay tónica con muestras suficientes: se usa la A fija");
+  }
+  ANT = prev; RES = res;
+  const ok = res.filter(fiable);
+  if (comun == null) {
+    $("comun").innerHTML = "No hay al menos dos notas fiables para calcular la desviación común.<small>Una nota necesita 8 apariciones o más y una dispersión de hasta 15 ¢. Toca más notas o prueba el modo «Notas largas».</small>";
+  } else {
+    const accion = Math.abs(comun) <= 3 ? "El conjunto está cerca de su referencia." : `${comun > 0 ? "Bajar" : "Subir"} el conjunto aproximadamente ${Math.abs(comun).toFixed(1)} ¢.`;
+    const detalle = $("ancla").checked
+      ? "Las medidas de cada nota están ancladas a la tónica; este valor conserva la desviación absoluta del conjunto."
+      : "Las desviaciones individuales de abajo incluyen esta parte común.";
+    $("comun").innerHTML = `Desviación común: <b>${sg(comun)} ¢</b> · ${accion}<small>Mediana de ${fiablesIniciales.length} notas fiables. Equivale a A≈${comunHz.toFixed(1)} Hz (referencia configurada: ${refA().toFixed(1)} Hz). ${detalle}</small>`;
+  }
+  let i = res.findIndex(r => r.cents != null);
+  if (!ok.length) partes.unshift("No hay notas con suficientes muestras estables. Revisa tonalidad y referencia, o graba más notas");
+  else {
+    const medio = ok.reduce((p, r) => p + Math.abs(r.cents), 0) / ok.length;
+    const dispIndividual = med(ok.map(r => Math.abs(r.cents - comun)));
+    const peor = ok.reduce((p, r) => Math.abs(r.cents) > Math.abs(p.cents) ? r : p);
+    partes.unshift(`Error absoluto medio: ${medio.toFixed(1)} ¢ · dispersión individual mediana tras corregir el conjunto: ${dispIndividual.toFixed(1)} ¢ · Ajusta primero: ${peor.nombre} (${sg(peor.cents)} ¢) · Notas con datos: ${res.filter(r => r.cents != null).length}/${res.length}`);
+    i = res.indexOf(peor);
+  }
+  // Intervalos clave respecto a la tónica (paso 3-4 de la guía)
+  const get = m => res.find(r => r.midi === m && fiable(r));
+  const t0 = get(tm()), q = get(tm() + 7), o = get(tm() + 12);
+  if (t0 && (q || o)) {
+    const it = []; if (q) it.push(`quinta ${sg(q.cents - t0.cents)} ¢`); if (o) it.push(`octava ${sg(o.cents - t0.cents)} ¢`);
+    partes.push("Respecto a la tónica: " + it.join(", ") + " sobre su objetivo");
+  }
+  // Aviso: nota intermedia repartida entre dos filas vecinas
+  for (let j = 0; j < res.length - 1; j++) {
+    const a = res[j], b = res[j + 1];
+    if (a.cents != null && b.cents != null && a.cents > 25 && b.cents < -25) {
+      partes.push(`Aviso: ${a.nombre} (${sg(a.cents)}) y ${b.nombre} (${sg(b.cents)}) parecen la misma nota intermedia (~${((a.hz + b.hz) / 2).toFixed(0)} Hz). Revisa la tabla o marca «solo notas naturales».`);
+      break;
+    }
+  }
+  est(partes.join(" · "));
+  prev = {}; res.filter(r => r.cents != null).forEach(r => prev[r.nombre] = r.cents);
+  seleccionar(i);
+}
+
+/* ---------- Informe: guardar y cargar para comparar entre sesiones ---------- */
+$("bInf").onclick = () => {
+  const l = RES.filter(r => r.cents != null);
+  if (!l.length) { est("Aún no hay resultados que guardar."); return; }
+  const f = new Date().toISOString();
+  const cab = `# Afinador punteiro · ${f.slice(0, 16).replace("T", " ")} · tonalidad ${NOM[+$("tono").value]} · A=${refA()} · ${$("ancla").checked ? "anclada a la tónica" : "A fija"}`;
+  const comunTxt = comunActual == null ? "no calculable" : `${sg(comunActual)} ¢ (A≈${(refA() * Math.pow(2, comunActual / 1200)).toFixed(1)} Hz)`;
+  const txt = cab + `\n# Desviación común: ${comunTxt}\n` + "nota;medida_hz;objetivo_hz;cents;variacion;apariciones;calidad\n" +
+    l.map(r => [r.nombre, r.hz.toFixed(2), r.obj.toFixed(2), r.cents.toFixed(1), r.disp.toFixed(1), r.n, r.n < 8 ? "pocas muestras" : r.disp > DISP_MAX ? "inestable" : "fiable"].join(";")).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([txt], { type: "text/plain" })); a.download = "afinacion_" + f.slice(0, 10) + ".txt";
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+};
+$("fInf").onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  const m = {};
+  (await f.text()).split("\n").forEach(s => { const p = s.split(";"); if (p.length >= 6 && !isNaN(parseFloat(p[3]))) m[p[0]] = parseFloat(p[3]); });
+  prev = m; ANT = m;
+  est(`Informe anterior cargado (${Object.keys(m).length} notas). Se usará para comparar.`);
+  seleccionar(sel);
+};
+
+aplicarTono();
+</script>
+</body>
+</html>
